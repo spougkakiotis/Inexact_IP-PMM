@@ -6,9 +6,9 @@ suitesparse = true;
 
 if (~suitesparse)
     %The path on which all the netlib problems lie
-    lib_path = '../../../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
+    lib_path = '../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
 else
-    lib_path = '../../SuiteSparse';
+    lib_path = '../SuiteSparse';
 end
 %Finds all the Netlib problems and stores their names in a struct
 d = dir(fullfile(lib_path,'*.mat')); 
