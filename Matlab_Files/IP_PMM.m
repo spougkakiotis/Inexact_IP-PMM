@@ -157,7 +157,7 @@ lambda = y;           % Initial estimate of the Lagrange multipliers.
 zeta = x;             % Initial estimate of the primal optimal solution.
 no_dual_update = 0;   % Primal infeasibility detection counter.
 no_primal_update = 0; % Dual infeasibility detection counter.
-reg_limit = max(5*tol*(1/max(norm(A,'inf')^2,norm(Q,'inf')^2)),1e-13); % Controlled perturbation.
+reg_limit = max(5*tol*(1/max(norm(A,'inf')^2,norm(Q,'inf')^2)),5e-10); % Controlled perturbation.
 reg_limit = min(reg_limit,10^(-8));
 autval = [];
 iterlin = 50;
@@ -166,13 +166,29 @@ roof = 3e7;
 nev = 10;             % Number of eigenvalues for tuning 
 nnz_switch = 100*m;   % if nnzL > switch then eigenvpairs are computed and tuned is performed
 itertot = zeros(2*maxit_IPM,1);
-solver = "minres";       % Specifies the Krylov solver for the iterative method (1: "pcg", 2: "minres").
-if (solver == "pcg")
-    maxit_Krylov = 250;
+if (nnz(Q) == nnz(spdiags(Q,0)))  % Specifies the Krylov solver for the iterative method (1: "pcg", 2: "minres")
+    solver = "pcg";
+    maxit_Krylov = 100;
+    fprintf("Employing pcg as Q is zero or diagonal.\n"); 
 else
-    maxit_Krylov = 750;
+    solver = "minres";
+    maxit_Krylov = 300;
+    fprintf("Employing minres as Q is neither zero nor diagonal.\n"); 
+    
+    % find the maximum nnz's in a signle row (or column of Q):
+   % max_Qcol_nnz = 0;
+   % [~,J,~] = find(Q);
+   % for i = 1:n
+   %     i_col_nnz = size(J,1) - nnz(J-i);
+   %     max_Qcol_nnz = max(max_Qcol_nnz,i_col_nnz);
+   % end
+   % Q_ne_approx = zeros(n,1);
+   % for i = 1:n
+   %     Q_ne_approx(i) = norm(Q(:,i),1);
+   % end
 end
-
+Q_ne_approx = spdiags(Q,0);
+%Q_ne_approx = spdiags(Q_ne_approx,0,n,n);
 % _____________________________________________________________________________________________________________________ %
 %% While block: IPM outer iterations.
 while (iter < maxit_IPM)
@@ -209,7 +225,7 @@ while (iter < maxit_IPM)
     res_p = nr_res_p - delta.*(y-lambda);                % Regularized primal residual.
     res_d = nr_res_d + rho.*(x-zeta);                    % Regularized dual residual.
     
-    if (norm(nr_res_p,'Inf')/(max(1,norm(b,'inf'))) < tol && norm(nr_res_d,'inf')/(max(1,norm(c,'inf'))) < tol &&  mu < tol )
+    if (norm(nr_res_p)/(max(10,norm(b))) < tol && norm(nr_res_d)/(max(10,norm(c))) < tol &&  mu < tol )
         fprintf('optimal solution found\n');
         opt = 1;
         break;
@@ -230,23 +246,22 @@ while (iter < maxit_IPM)
     % ================================================================================================================ %
     % Avoid the possibility of converging to a local minimum -> Decrease the minimum regularization value.
     % ---------------------------------------------------------------------------------------------------------------- %
-  %  if (no_primal_update > 5 && rho == reg_limit && reg_limit ~= 1e-13)
-  %      reg_limit = 1e-13;
-  %      no_primal_update = 0;
-  %      no_dual_update = 0;
-  %  elseif (no_dual_update > 5 && delta == reg_limit && reg_limit ~= 1e-13)
-  %      reg_limit = 1e-13;
-  %      no_primal_update = 0;
-  %      no_dual_update = 0;
-  %  end
+    if (no_primal_update > 5 && rho == reg_limit && reg_limit ~= 1e-13)
+        reg_limit = 1e-13;
+        no_primal_update = 0;
+        no_dual_update = 0;
+    elseif (no_dual_update > 5 && delta == reg_limit && reg_limit ~= 1e-13)
+        reg_limit = 1e-13;
+        no_primal_update = 0;
+        no_dual_update = 0;
+    end
     % ________________________________________________________________________________________________________________ %
     
     %% ================================================================================================================ %
     % Compute the Newton factorization.
     % ---------------------------------------------------------------------------------------------------------------- %
-    NS = Newton_matrix_setting(iter,A,A_tr,Q,x,z,delta,rho,pos_vars,free_variables);
+    NS = Newton_matrix_setting(iter,A,A_tr,Q,x,z,delta,rho,pos_vars,free_variables,tol);
     % _________________________________________________________________________________________________________________ %
-    
     %% Predictor-Corrector or Simple iteration if-else block
     if (pc == false) % 
         %% No predictor-corrector. 
@@ -274,7 +289,7 @@ while (iter < maxit_IPM)
             nnzL = 0;
         end  
         [droptol,maxit_Krylov] = settol(droptol,iterlin,maxit_Krylov,nnzL,roof);
-        PS = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver); % Create the preconditioner for the predictor system.
+        PS = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver,Q_ne_approx); % Create the preconditioner for the predictor system.
         [dx,dy,dz,instability,iterlin] = Newton_itersolve(fid,1,NS,PS,res_p,res_d,res_mu,maxit_Krylov,solver);
         itertot(iter) = iterlin;
         if (instability == true) % Checking if the matrix is too ill-conditioned. Mitigate it.
@@ -311,7 +326,7 @@ while (iter < maxit_IPM)
             nnzL = 0;
         end  
         [droptol,maxit_Krylov] = settol(droptol,iterlin,maxit_Krylov,nnzL,roof);
-        PS = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver); % Create the preconditioner for the predictor system.
+        PS = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver,Q_ne_approx); % Create the preconditioner for the predictor system.
         if (PS.instability == false)
             [dx,dy,dz,instability,iterlin,drop_direction] = Newton_itersolve(fid,1,NS,PS,res_p,res_d,res_mu,maxit_Krylov,solver);
         else
@@ -338,6 +353,7 @@ while (iter < maxit_IPM)
                 retry_p = retry_p + 1;
                 no_primal_update = 0;
                 no_dual_update = 0;
+                iterlin = maxit_Krylov;
                 continue;
             else
                 fprintf('Not enough accuracy.\n');
@@ -362,7 +378,7 @@ while (iter < maxit_IPM)
         alpha_z = tau*alphamax_z;
         % ____________________________________________________________________________________________________________ %
         centrality_measure = (x(pos_vars) + alpha_x.*dx(pos_vars))'*(z(pos_vars) + alpha_z.*dz(pos_vars));
-        mu = (centrality_measure/(num_of_pos_vars*mu))^2*(centrality_measure/num_of_pos_vars);
+        mu = max((centrality_measure/(num_of_pos_vars*mu))^2*(centrality_measure/num_of_pos_vars),1e-14);
     % ________________________________________________________________________________________________________________ %
         
     %% ================================================================================================================ %
@@ -414,8 +430,6 @@ while (iter < maxit_IPM)
         dz = dz + dz_c;
     % ________________________________________________________________________________________________________________ %
     end
-    
-    
     %% ================================================================================================================ %
     % Compute the new iterate:
     % Determine primal and dual step length. Calculate "step to the boundary" alphamax_x and alphamax_z. 
@@ -496,12 +510,13 @@ while (iter < maxit_IPM)
     %% ================================================================================================================ %
     % Print iteration output.  
     % ---------------------------------------------------------------------------------------------------------------- %
-    pres_inf = norm(new_nr_res_p,'inf');
-    dres_inf = norm(new_nr_res_d,'inf');  
+    pres_inf = norm(new_nr_res_p);
+    dres_inf = norm(new_nr_res_d);  
     output(fid,pl,iter,pres_inf,dres_inf,mu,sigma,alpha_x,alpha_z,delta);
     fprintf('\n');
     % ________________________________________________________________________________________________________________ %
 end % while (iter < maxit)
+
 
 % The IPM has terminated because the solution accuracy is reached or the maximum number 
 % of iterations is exceeded, or the problem under consideration is infeasible. Print result.  

@@ -28,9 +28,11 @@ function [dx,dy,dz,instability,iter,drop_direction] = Newton_itersolve(fid,pred,
 	    rhs = [res_d; res_p];
     end
     
-    Theta = 1./NS.ThetaInv;
     if (solver == "pcg")
+        Theta = 1./(NS.ThetaInv+spdiags(NS.Q,0));
         rhs_y = NS.A*(Theta.*rhs(1:n)) + rhs(n+1:n+m);
+    else
+        Theta = 1./(NS.ThetaInv);
     end
     % ____________________________________________________________________________________________________________________ %
     
@@ -40,13 +42,13 @@ function [dx,dy,dz,instability,iter,drop_direction] = Newton_itersolve(fid,pred,
     warn_stat = warning;
     warning('off','all');
     if (solver == "pcg")
-        tol = max(1e-8,1e-4/max(1,norm(rhs_y,'Inf')));
+        tol = max(1e-10,NS.IP_tol/max(1,norm(rhs_y,'Inf')));
         [lhs_y, flag, res, iter] = pcg(@(x) NE_multiplier(x,NS), rhs_y, tol, maxit, @(x) Precond_Operator(x,PS,solver));
-        lhs_x = Theta.*(-rhs(1:n) + NS.A_tr*lhs_y);
+        lhs_x = (Theta).*(-rhs(1:n) + NS.A_tr*lhs_y);
         lhs = [lhs_x; lhs_y];
         accuracy_bound = 1e-1;
     elseif (solver == "minres")
-        tol = max(1e-8,1e-4/max(1,norm(rhs,'Inf')));
+        tol = max(1e-10,(NS.IP_tol)/max(1,norm(rhs,'Inf')));
         [lhs, flag, res, iter] = minres(@(x) AS_multiplier(x,NS), rhs, tol, maxit, @(x) Precond_Operator(x,PS,solver));
         accuracy_bound = 1e-1;
     end

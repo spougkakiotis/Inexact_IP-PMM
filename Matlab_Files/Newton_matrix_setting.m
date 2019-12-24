@@ -1,4 +1,4 @@
-function [NS] = Newton_matrix_setting(iter,A,A_tr,Q,x,z,delta,rho,pos_vars,free_vars)
+function [NS] = Newton_matrix_setting(iter,A,A_tr,Q,x,z,delta,rho,pos_vars,free_vars,tol)
 %% ==================================================================================================================== %
 % Newton_matrix_setting: Store all relevant information about the Newton matrix.
 % --------------------------------------------------------------------------------------------------------------------- %
@@ -20,7 +20,7 @@ NS = struct();
     NS.m = m;
     NS.n = n;
     R_ThetaInv = zeros(n,1);
-    if (size(pos_vars,1) > 0) % Q_bar is the diagonal of the Hessian of the objective function.
+    if (size(pos_vars,1) > 0) 
         R_ThetaInv(pos_vars) = z(pos_vars)./x(pos_vars) + rho;
         R_ThetaInv(free_vars) = rho;
     else
@@ -31,6 +31,7 @@ NS = struct();
     NS.IPiter = iter;
     NS.pos_vars = pos_vars;
     NS.free_vars = free_vars;
+    NS.IP_tol = tol;
 % ____________________________________________________________________________________________________________________ %
  
 % ******************************************************************************************************************** %

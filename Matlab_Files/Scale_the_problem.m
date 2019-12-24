@@ -32,7 +32,7 @@ function [D,D_L] = Scale_the_problem(A,scale_option,direction)
     pos_A = abs(A);       % Need it to identify non-zero elements.
     D = zeros(size(A,2),1);
     D_L = [];
-    pos_ind = pos_A > 0;   
+    pos_ind = pos_A > 1e-8;   
     % ================================================================================================================ %
     % Based on the input parameters, build the desired scaling factor.
     % ---------------------------------------------------------------------------------------------------------------- %

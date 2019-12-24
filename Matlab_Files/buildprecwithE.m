@@ -1,4 +1,4 @@
-function [PS] = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver)
+function [PS] = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver,Q_ne_approx)
 %% ==================================================================================================================== %
 % Build Preconditioner with matrix E: An approximation of the Schur complement.
 % -------------------------------------------------------------------------------------------------------------------- %
@@ -20,13 +20,16 @@ function [PS] = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver)
     % ----------------------------------------------------------------------------------------------------------------- %
    
     B = true(n,1);
-    E = 1./(NS.ThetaInv + spdiags(NS.Q,0));
     if (solver == "minres")
-        PS.Q_barInv = E;
+%        E = 1./(NS.ThetaInv +  max_Qcol_nnz.*spdiags(NS.Q,0));
+       E = 1./(NS.ThetaInv +  Q_ne_approx);
+
+        PS.Q_barInv = 1./(NS.ThetaInv + spdiags(NS.Q,0));
+    else
+        E = 1./(NS.ThetaInv + spdiags(NS.Q,0));
     end
     N = (E<threshold);
     B = xor(B,N);                                 % N = {1,...,n}\B.
-  
   
     E(N) = 0;
     if (nnz(B) > 0)
@@ -39,7 +42,6 @@ function [PS] = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver)
         PS.instability = false;
         PS.maxpiv = maxpiv;
         if (nnz(B) > 0)
-            M = M + min(1e-2,maxpiv*eps)*speye(m);                                  % extra ``regularization'' 
             [PS.L_M,chol_flag,PS.P] = chol(M,'lower','vector');                         % Cholesky factorization
         else
             PS.L_M = speye(m);
@@ -62,10 +64,10 @@ function [PS] = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver)
     if nnz(PS.L_M)  > nnz_switch
         PS.switch = true;
         % V contains the approximate eigenvectors of M^{-1} (A Theta A_tr) as columns
-        [PS.V,D] = eigs(@(x) perm(NE_multiplier(x,NS),PS.L_M,PS.P,PS.Pinv),m,nev,'lm','Tolerance',1e-2);
+        [PS.V,D] = eigs(@(x) perm(NE_multiplier(x,NS),PS.L_M,PS.P,PS.Pinv),m,nev,'lm','Tolerance',1e-3);
         maxeig = spdiags(D,0);
 	    cond = max(maxeig)/min(maxeig);           % partial condition number 
-        if (cond > 1e8 || cond <= 0)
+        if (cond > 1e5 || cond <= nev)
            PS.switch = false;
            PS.V = [];
            PS.TL = [];

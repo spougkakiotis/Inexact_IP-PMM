@@ -18,7 +18,7 @@ function [droptol,itmax] = settol(droptol,iter,itmax,nnzL,roof)
         droptol = min(droptol/2,droptol_thr);
         return
     elseif (nnzL > roof)
-        droptol = min(droptol/4,droptol_thr);
+        droptol = min(droptol/3,droptol_thr);
        % itmax = itmax + 100;
         return
     end

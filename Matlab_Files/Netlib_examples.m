@@ -2,13 +2,13 @@
 clear all;
 clc;
 
-suitesparse = false;
+suitesparse = true;
 
 if (~suitesparse)
     %The path on which all the netlib problems lie
-    lib_path = '../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
+    lib_path = '../../../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
 else
-    lib_path = '../SuiteSparse';
+    lib_path = '../../SuiteSparse';
 end
 %Finds all the Netlib problems and stores their names in a struct
 d = dir(fullfile(lib_path,'*.mat')); 
@@ -17,24 +17,25 @@ whos d
 
 %Open the file to write the results
 %fileID = fopen('Netlib_tabular_format_final_results.txt','a+');
-fileID = fopen('results.txt','a+');
+fileID = fopen('Netlib_results.txt','a+');
 fields = {'A','obj','sense','rhs','lb','ub','vtype','modelname','varnames','constrnames'};
 total_iters = 0;
 total_time = 0;
 total_in_iters = 0;
 scaling_direction = 'r';
-scaling_mode = 3;
+scaling_mode = 1;
 pc_mode = true;
-tol = 1e-6;
+tol = 1e-4;
 print_mode = 2;
 maxit = 200;
 %Each indice k=1..num_of_netlib_files gives the name of each netlib problem through d(i).name
-w = [1:96];
+w = [19];
+%w = [] 2, 3, 4, 5, 6, 9, 13 
 problems_converged = 0;
-%for k =w 
- %  load(fullfile(lib_path,d(k).name))
-  %      disp(d(k).name)
-%end   
+for k =w 
+   load(fullfile(lib_path,d(k).name))
+        disp(d(k).name)
+end   
 for k = w
         load(fullfile(lib_path,d(k).name))
         disp(d(k).name)
@@ -42,11 +43,14 @@ for k = w
     %file = strcat('output_',d(k).name)
     file = 'output';
     if suitesparse
+        if (k == 28 || k == 29)
+            scaling_direction = 'no scaling';
+        end
         c = Problem.aux.c;
         A = Problem.A;
         b = Problem.b;
 
-
+       
         ub = Problem.aux.hi;
         lb = Problem.aux.lo;
 
@@ -55,7 +59,6 @@ for k = w
         sense = char(sense);
         [c,A,b,free_variables,objective_const_term] = LP_Convert_to_Standard_Form(c, A, b, lb, ub, sense);
     else
-    
         c = model.obj;
         A = model.A;
         b = model.rhs;
