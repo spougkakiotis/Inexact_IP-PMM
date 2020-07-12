@@ -1,4 +1,4 @@
-function [x,y,z,opt,iter,totiter,autval] = IP_PMM(file,c,A,Q,b,free_variables,tol,maxit_IPM,pc,printlevel)
+function [x,y,z,opt,iter,totiter,low_rank] = IP_PMM(file,c,A,Q,b,free_variables,tol,maxit_IPM,pc,printlevel)
 % ==================================================================================================================== %
 % This function is an Interior Point-Proximal Method of Multipliers, suitable for solving linear and convex quadratic
 % programming problems. The method takes as input a problem of the following form:
@@ -159,12 +159,13 @@ no_dual_update = 0;   % Primal infeasibility detection counter.
 no_primal_update = 0; % Dual infeasibility detection counter.
 reg_limit = max(5*tol*(1/max(norm(A,'inf')^2,norm(Q,'inf')^2)),5e-10); % Controlled perturbation.
 reg_limit = min(reg_limit,10^(-8));
-autval = [];
+low_rank = false;
 iterlin = 50;
 droptol = 1e2;  
 roof = 3e7;
 nev = 10;             % Number of eigenvalues for tuning 
 nnz_switch = 100*m;   % if nnzL > switch then eigenvpairs are computed and tuned is performed
+max_nnz_P = 0;
 itertot = zeros(2*maxit_IPM,1);
 if (nnz(Q) == nnz(spdiags(Q,0)))  % Specifies the Krylov solver for the iterative method (1: "pcg", 2: "minres")
     solver = "pcg";
@@ -174,21 +175,8 @@ else
     solver = "minres";
     maxit_Krylov = 300;
     fprintf("Employing minres as Q is neither zero nor diagonal.\n"); 
-    
-    % find the maximum nnz's in a signle row (or column of Q):
-   % max_Qcol_nnz = 0;
-   % [~,J,~] = find(Q);
-   % for i = 1:n
-   %     i_col_nnz = size(J,1) - nnz(J-i);
-   %     max_Qcol_nnz = max(max_Qcol_nnz,i_col_nnz);
-   % end
-   % Q_ne_approx = zeros(n,1);
-   % for i = 1:n
-   %     Q_ne_approx(i) = norm(Q(:,i),1);
-   % end
 end
 Q_ne_approx = spdiags(Q,0);
-%Q_ne_approx = spdiags(Q_ne_approx,0,n,n);
 % _____________________________________________________________________________________________________________________ %
 %% While block: IPM outer iterations.
 while (iter < maxit_IPM)
@@ -250,7 +238,7 @@ while (iter < maxit_IPM)
         reg_limit = 1e-13;
         no_primal_update = 0;
         no_dual_update = 0;
-    elseif (no_dual_update > 5 && delta == reg_limit && reg_limit ~= 1e-13)
+   elseif (no_dual_update > 5 && delta == reg_limit && reg_limit ~= 1e-13)
         reg_limit = 1e-13;
         no_primal_update = 0;
         no_dual_update = 0;
@@ -327,6 +315,10 @@ while (iter < maxit_IPM)
         end  
         [droptol,maxit_Krylov] = settol(droptol,iterlin,maxit_Krylov,nnzL,roof);
         PS = buildprecwithE(NS,nnz_switch,droptol,mu,nev,solver,Q_ne_approx); % Create the preconditioner for the predictor system.
+        max_nnz_P = max(max_nnz_P,nnzL);
+        if (PS.switch == true)
+            low_rank = true;
+        end
         if (PS.instability == false)
             [dx,dy,dz,instability,iterlin,drop_direction] = Newton_itersolve(fid,1,NS,PS,res_p,res_d,res_mu,maxit_Krylov,solver);
         else
@@ -393,6 +385,10 @@ while (iter < maxit_IPM)
         nnzL = nnz(PS.L_M); % maximum allowed nonzeros in L_M
         [droptol,maxit_Krylov] = settol(droptol,iterlin,maxit_Krylov,nnzL,roof);
         [dx_c,dy_c,dz_c,instability,iterlin,drop_direction] = Newton_itersolve(fid,0,NS,PS,zeros(m,1),zeros(n,1),res_mu,maxit_Krylov,solver);
+        max_nnz_P = max(max_nnz_P,nnzL);
+        if (PS.switch == true)
+            low_rank = true;
+        end
         if (instability == true) % Checking if the matrix is too ill-conditioned. Mitigate it.
             if (retry_c < max_tries)
                 fprintf('The system is re-solved, due to bad conditioning of corrector.\n')
@@ -423,7 +419,7 @@ while (iter < maxit_IPM)
             end
         end
         retry_c = 0;
-        itertot(2*iter-1) = iterlin;
+        itertot(2*iter) = iterlin;
         % ____________________________________________________________________________________________________________ %
         dx = dx + dx_c;
         dy = dy + dy_c;
@@ -526,6 +522,8 @@ fprintf('CG iterations: %4d\n', totiter);
 fprintf('primal feasibility: %8.2e\n', norm(A*x-b));
 fprintf('dual feasibility: %8.2e\n', norm(A'*y+z-c - Q*x));
 fprintf('complementarity: %8.2e\n', full(dot(x,z)/n));  
+
+fprintf('maximum prec. nnz %d, num. of eigen. %d', max_nnz_P,nev)
 end
 
 

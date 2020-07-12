@@ -2,11 +2,11 @@
 clear all;
 clc;
 
-suitesparse = true;
+suitesparse = false;
 
 if (~suitesparse)
     %The path on which all the netlib problems lie
-    lib_path = '../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
+    lib_path = '../../NETLIB_PROBLEMS_IN_MATLAB_FORM/netlib';
 else
     lib_path = '../SuiteSparse';
 end
@@ -29,7 +29,7 @@ tol = 1e-4;
 print_mode = 2;
 maxit = 200;
 %Each indice k=1..num_of_netlib_files gives the name of each netlib problem through d(i).name
-w = [19];
+w = [1];
 %w = [] 2, 3, 4, 5, 6, 9, 13 
 problems_converged = 0;
 for k =w 
@@ -105,7 +105,7 @@ for k = w
     else
         if (opt == 1)
            problems_converged = problems_converged + 1;
-           fprintf(fileID,'%s & %d & %d & %9.2f & opt  \n',model.modelname, iter, totiter, time); 
+           fprintf(fileID,'%s & %d & %d & %9.2f & opt  & %d \n',model.modelname, iter, totiter, time, autval); 
            fprintf(fileID,'The optimal solution objective is %d.\n',obj_val);
         else
            fprintf(fileID,'%s & %d & %d & non-opt \n',model.modelname, iter, time); 

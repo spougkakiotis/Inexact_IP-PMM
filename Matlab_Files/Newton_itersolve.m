@@ -53,6 +53,7 @@ function [dx,dy,dz,instability,iter,drop_direction] = Newton_itersolve(fid,pred,
         accuracy_bound = 1e-1;
     end
     warning(warn_stat);
+    
     % ____________________________________________________________________________________________________________________ %
     %% ==================================================================================================================== %
     % Compute the Newton directions and report the relevant statistics.

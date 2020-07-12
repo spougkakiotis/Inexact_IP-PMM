@@ -3,7 +3,7 @@
 clear all;
 clc;
 %The path on which all the netlib problems lie
-QP_problems_path = '../../../QP_PROBLEMS/QPset/maros_CONT'; 
+QP_problems_path = '../../QP_PROBLEMS/QPset/maros_CONT'; 
 
 %Finds all the Netlib problems and stores their names in a struct
 d = dir(fullfile(QP_problems_path,'*.mat')); 
@@ -23,7 +23,7 @@ total_iters = 0;
 total_time = 0;
 scaling_option = 1;
 scaling_direction = 'r';
-tol = 1e-4; 
+tol = 1e-8; 
 max_iters = 200;
 total_in_iters = 0;
 
